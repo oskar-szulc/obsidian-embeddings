@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createEmbedder, docInput, EmbedError, queryInput } from '../src/embed'
 import { chunkNote, isSkipped, MAX_CHUNK_CHARS } from '../src/chunk'
+import { VectorIndex } from '../src/index'
 
 // ---- embed ----
 assert.equal(docInput('T', 'x'), 'title: T | text: x')
@@ -68,3 +69,46 @@ console.log('embed ok')
   assert.ok(!isSkipped('notes/Example.md'))
 }
 console.log('chunk ok')
+
+// ---- index ----
+{
+  const v = (...xs: number[]) => Float32Array.from(xs)
+  const ix = new VectorIndex('m', 2)
+  ix.setFile('a.md', 1, [{ heading: '', vector: v(1, 0) }, { heading: 'H', vector: v(0, 1) }])
+  ix.setFile('b.md', 1, [{ heading: '', vector: v(0.6, 0.8) }])
+  ix.setFile('c.md', 1, [{ heading: '', vector: v(-1, 0) }])
+  ix.setFile('empty.md', 1, [])
+
+  assert.deepEqual(ix.search(v(0, 1), 2).map((h) => [h.path, h.heading]), [['a.md', 'H'], ['b.md', '']])
+
+  const r = ix.related('a.md', 10, new Set())
+  assert.deepEqual(r.map((h) => h.path), ['b.md', 'c.md'])
+  assert.ok(Math.abs(r[0].score - 0.8) < 1e-6)
+  assert.deepEqual(ix.related('a.md', 10, new Set(['b.md'])).map((h) => h.path), ['c.md'])
+
+  assert.ok(ix.has('empty.md'))
+  assert.deepEqual(
+    ix.stalePaths([{ path: 'a.md', mtime: 1 }, { path: 'b.md', mtime: 2 }, { path: 'd.md', mtime: 1 }, { path: 'empty.md', mtime: 1 }]),
+    ['b.md', 'd.md'],
+  )
+
+  ix.setFile('a.md', 2, [{ heading: '', vector: v(1, 0) }])
+  assert.equal(ix.search(v(0, 1), 10).find((h) => h.path === 'a.md')!.heading, '')
+
+  const back = VectorIndex.parse(ix.toJSON(), 'm', 2)
+  assert.deepEqual(back.search(v(1, 0), 10), ix.search(v(1, 0), 10))
+  assert.deepEqual(back.stalePaths([{ path: 'a.md', mtime: 2 }]), [])
+  assert.ok(!VectorIndex.parse(ix.toJSON(), 'other', 2).has('a.md'))
+  assert.ok(!VectorIndex.parse(ix.toJSON(), 'm', 3).has('a.md'))
+  assert.ok(!VectorIndex.parse('{bad', 'm', 2).has('a.md'))
+  assert.ok(!VectorIndex.parse(null, 'm', 2).has('a.md'))
+
+  ix.rename('b.md', 'x/b.md')
+  assert.ok(ix.has('x/b.md') && !ix.has('b.md'))
+  assert.equal(ix.search(v(0.6, 0.8), 1)[0].path, 'x/b.md')
+  ix.remove('c.md')
+  assert.ok(!ix.has('c.md') && !ix.search(v(-1, 0), 10).some((h) => h.path === 'c.md'))
+  ix.prune(new Set(['a.md']))
+  assert.ok(ix.has('a.md') && !ix.has('x/b.md') && !ix.has('empty.md'))
+}
+console.log('index ok')
