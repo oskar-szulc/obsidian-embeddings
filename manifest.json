@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-embeddings",
+  "name": "Local Embeddings",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Related notes and semantic search with a local embedding model.",
+  "author": "Oskar Szulc",
+  "isDesktopOnly": true
+}

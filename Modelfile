@@ -1,0 +1,4 @@
+FROM hf.co/unsloth/embeddinggemma-2-GGUF:UD-Q4_K_XL
+# Ollama caps embedding input at num_batch (default 2048 tokens) and truncates silently.
+PARAMETER num_ctx 8192
+PARAMETER num_batch 8192
