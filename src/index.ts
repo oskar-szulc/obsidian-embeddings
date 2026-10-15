@@ -96,6 +96,7 @@ export class VectorIndex {
 
   related(path: string, k: number, exclude: Set<string>): Hit[] {
     const own = this.chunks.filter((c) => c.path === path)
+    if (!own.length) return []
     const others = this.chunks.filter((c) => c.path !== path && !exclude.has(c.path))
     return this.rank(others, (c) => Math.max(...own.map((o) => dot(o.vector, c.vector))), k)
   }
