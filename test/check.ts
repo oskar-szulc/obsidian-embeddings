@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createEmbedder, docInput, EmbedError, queryInput } from '../src/embed'
 import { chunkNote, isSkipped, MAX_CHUNK_CHARS } from '../src/chunk'
 import { VectorIndex } from '../src/index'
+import { addRelatedLink } from '../src/related'
 
 // ---- embed ----
 assert.equal(docInput('T', 'x'), 'title: T | text: x')
@@ -112,3 +113,15 @@ console.log('chunk ok')
   assert.ok(ix.has('a.md') && !ix.has('x/b.md') && !ix.has('empty.md'))
 }
 console.log('index ok')
+
+// ---- related ----
+assert.equal(addRelatedLink('# T\nbody', 'X'), '# T\nbody\n\n## Related\n[[X]]\n')
+assert.equal(addRelatedLink('# T\nbody\n\n', 'X'), '# T\nbody\n\n## Related\n[[X]]\n')
+assert.equal(addRelatedLink('# T\n\n## References\nhttp://a', 'X'), '# T\n\n## Related\n[[X]]\n\n## References\nhttp://a')
+assert.equal(addRelatedLink('## Related\n[[A]] • [[B]]\n', 'X'), '## Related\n[[A]] • [[B]] • [[X]]\n')
+assert.equal(addRelatedLink('## Related\n\n## References\nr', 'X'), '## Related\n[[X]]\n\n## References\nr')
+assert.equal(addRelatedLink('## Related\nSee also:\n', 'X'), '## Related\n[[X]]\nSee also:\n')
+for (const md of ['## Related\n[[X]]', '## Related\n[[x|alias]]', '## Related\n[[X#Part]]'])
+  assert.equal(addRelatedLink(md, 'X'), md, `duplicate: ${md}`)
+assert.equal(addRelatedLink('## Related\n[[A]]\n## Other\n[[X]]', 'X'), '## Related\n[[A]] • [[X]]\n## Other\n[[X]]')
+console.log('related ok')
