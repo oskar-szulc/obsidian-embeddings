@@ -5,8 +5,9 @@ import type { Hit } from './index'
 import { addRelatedLink } from './related'
 
 export const VIEW_TYPE = 'embeddings-related'
-// Starting guess. Task 8 replaces it with a value measured on the vault.
-export const MIN_SCORE = 0.5
+// 25th percentile of linked-note pair scores (scripts/measure-output.txt, 2026-10-15). Random pairs reach
+// 0.86 at p95, above the linked median (0.82), so the random-p95 rule would hide most real neighbours.
+export const MIN_SCORE = 0.76
 
 export const label = (hit: Hit) =>
   hit.path.replace(/\.md$/, '').split('/').pop()! + (hit.heading ? ` › ${hit.heading}` : '')
