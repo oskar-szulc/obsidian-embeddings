@@ -2,7 +2,7 @@ import { debounce, Notice, Plugin, requestUrl, TAbstractFile, TFile } from 'obsi
 import { chunkNote, isSkipped } from './chunk'
 import { createEmbedder, DIMS, docInput, EmbedError, MODEL, type Transport } from './embed'
 import { VectorIndex } from './index'
-import { RelatedView, VIEW_TYPE } from './views'
+import { RelatedView, SearchModal, VIEW_TYPE } from './views'
 
 // requestUrl skips CORS, so fetch's origin restrictions don't apply here.
 const transport: Transport = async (url, body) => {
@@ -26,6 +26,7 @@ export default class EmbeddingsPlugin extends Plugin {
   async onload() {
     this.registerView(VIEW_TYPE, (leaf) => new RelatedView(leaf, this))
     this.addCommand({ id: 'open-related', name: 'Open related notes', callback: () => void this.openRelated() })
+    this.addCommand({ id: 'semantic-search', name: 'Semantic search', callback: () => new SearchModal(this.app, this).open() })
     this.addCommand({ id: 'rebuild-index', name: 'Rebuild index', callback: () => this.rebuild() })
 
     this.app.workspace.onLayoutReady(async () => {

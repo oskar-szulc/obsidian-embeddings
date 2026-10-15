@@ -1,5 +1,6 @@
-import { ItemView, TFile, WorkspaceLeaf } from 'obsidian'
+import { App, ItemView, Notice, SuggestModal, TFile, WorkspaceLeaf } from 'obsidian'
 import type EmbeddingsPlugin from './main'
+import { EmbedError, queryInput } from './embed'
 import type { Hit } from './index'
 import { addRelatedLink } from './related'
 
@@ -62,5 +63,40 @@ export class RelatedView extends ItemView {
         row.remove()
       }
     }
+  }
+}
+
+export class SearchModal extends SuggestModal<Hit> {
+  private seq = 0
+  private last: Hit[] = []
+
+  constructor(app: App, private plugin: EmbeddingsPlugin) {
+    super(app)
+    this.setPlaceholder('Search notes by meaning…')
+  }
+
+  // Called on every keystroke. Only the newest query, 300 ms after typing stops, gets embedded.
+  async getSuggestions(query: string): Promise<Hit[]> {
+    const id = ++this.seq
+    if (!query.trim()) return (this.last = [])
+    await new Promise((r) => window.setTimeout(r, 300))
+    if (id !== this.seq) return this.last
+    try {
+      const [v] = await this.plugin.embedder.embed([queryInput(query)])
+      if (id === this.seq) this.last = this.plugin.index.search(v, 20)
+    } catch (e) {
+      if (id === this.seq) new Notice(e instanceof EmbedError ? e.message : String(e))
+    }
+    return this.last
+  }
+
+  renderSuggestion(hit: Hit, el: HTMLElement) {
+    el.createDiv({ text: label(hit) })
+    el.createEl('small', { text: hit.score.toFixed(2), cls: 'embeddings-score' })
+  }
+
+  onChooseSuggestion(hit: Hit) {
+    const target = hit.path.replace(/\.md$/, '') + (hit.heading ? `#${hit.heading}` : '')
+    void this.app.workspace.openLinkText(target, '')
   }
 }
