@@ -33,9 +33,20 @@ export class RelatedView extends ItemView {
     this.render()
   }
 
+  // Debug ignores MIN_SCORE and dims rows below it. Lives as long as the view.
+  private debug = false
+
   render() {
     const el = this.contentEl
     el.empty()
+    const toggle = el.createEl('label', { cls: 'embeddings-debug' })
+    const box = toggle.createEl('input', { type: 'checkbox' })
+    box.checked = this.debug
+    box.onchange = () => {
+      this.debug = box.checked
+      this.render()
+    }
+    toggle.appendText(' Debug')
     // Returns the most recently active note even while the sidebar has focus.
     const file = this.app.workspace.getActiveFile()
     const { index, error } = this.plugin
@@ -45,11 +56,24 @@ export class RelatedView extends ItemView {
     if (!index.has(file.path)) return void el.createEl('p', { text: 'Not indexed yet.' })
 
     const linked = new Set(Object.keys(this.app.metadataCache.resolvedLinks[file.path] ?? {}))
-    const hits = index.related(file.path, 10, linked).filter((h) => h.score >= MIN_SCORE)
-    if (!hits.length) return void el.createEl('p', { text: 'No related notes found.' })
+    const chunks = index.chunkCount(file.path)
+    if (this.debug)
+      el.createEl('p', { text: `${chunks} chunks · ${linked.size} linked (hidden) · threshold ${MIN_SCORE}`, cls: 'embeddings-debug' })
+    if (!chunks) return void el.createEl('p', { text: 'This note has no text to embed.' })
 
+    const all = index.related(file.path, 10, linked)
+    const hits = this.debug ? all : all.filter((h) => h.score >= MIN_SCORE)
+    if (!hits.length)
+      return void el.createEl('p', { text: `No related notes above ${MIN_SCORE}. Turn on Debug to see the closest ones.` })
+
+    let divider = false
     for (const hit of hits) {
-      const row = el.createDiv({ cls: 'embeddings-row' })
+      const below = hit.score < MIN_SCORE
+      if (below && !divider) {
+        el.createDiv({ text: `— below ${MIN_SCORE} —`, cls: 'embeddings-debug embeddings-divider' })
+        divider = true
+      }
+      const row = el.createDiv({ cls: below ? 'embeddings-row embeddings-below' : 'embeddings-row' })
       const name = row.createEl('a', { text: label(hit), cls: 'embeddings-name', href: '#' })
       name.onclick = (e) => {
         e.preventDefault()

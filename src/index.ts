@@ -64,6 +64,10 @@ export class VectorIndex {
     return this.files.has(path)
   }
 
+  chunkCount(path: string) {
+    return this.chunks.filter((c) => c.path === path).length
+  }
+
   setFile(path: string, mtime: number, chunks: { heading: string; vector: Float32Array }[]) {
     this.files.set(path, mtime)
     this.chunks = this.chunks.filter((c) => c.path !== path).concat(chunks.map((c) => ({ path, ...c })))

@@ -2,3 +2,6 @@
 .embeddings-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .embeddings-score { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .embeddings-error { color: var(--text-error); font-size: var(--font-ui-small); }
+.embeddings-debug { display: block; color: var(--text-muted); font-size: var(--font-ui-smaller); margin: 2px 0 6px; }
+.embeddings-divider { text-align: center; margin: 6px 0 2px; }
+.embeddings-below { opacity: 0.55; }

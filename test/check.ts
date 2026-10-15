@@ -88,6 +88,9 @@ console.log('chunk ok')
   assert.deepEqual(ix.related('a.md', 10, new Set(['b.md'])).map((h) => h.path), ['c.md'])
 
   assert.ok(ix.has('empty.md'))
+  assert.equal(ix.chunkCount('a.md'), 2)
+  assert.equal(ix.chunkCount('empty.md'), 0)
+  assert.equal(ix.chunkCount('missing.md'), 0)
   assert.deepEqual(ix.related('empty.md', 10, new Set()), [], 'note without chunks has no related notes')
   assert.deepEqual(
     ix.stalePaths([{ path: 'a.md', mtime: 1 }, { path: 'b.md', mtime: 2 }, { path: 'd.md', mtime: 1 }, { path: 'empty.md', mtime: 1 }]),
