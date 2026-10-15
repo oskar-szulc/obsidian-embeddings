@@ -39,8 +39,9 @@ export class RelatedView extends ItemView {
     // Returns the most recently active note even while the sidebar has focus.
     const file = this.app.workspace.getActiveFile()
     const { index, error } = this.plugin
-    if (error) return void el.createEl('p', { text: error })
     if (!file) return void el.createEl('p', { text: 'No note open.' })
+    // Related notes come from stored vectors, so they keep working while the server is down.
+    if (error) el.createEl('p', { text: error, cls: 'embeddings-error' })
     if (!index.has(file.path)) return void el.createEl('p', { text: 'Not indexed yet.' })
 
     const linked = new Set(Object.keys(this.app.metadataCache.resolvedLinks[file.path] ?? {}))

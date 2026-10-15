@@ -17,7 +17,9 @@ export default class EmbeddingsPlugin extends Plugin {
   private queue = new Set<string>()
   private running = false
   private timers = new Map<string, number>()
-  private scheduleSave = debounce(() => void this.saveIndex(), 2000, true)
+  private dirty = false
+  // index.json is ~15MB inside an iCloud-synced vault: small changes are batched into one write.
+  private scheduleSave = debounce(() => void this.saveIndex(), 30000, true)
 
   private get indexPath() {
     return `${this.manifest.dir}/index.json`
@@ -36,6 +38,7 @@ export default class EmbeddingsPlugin extends Plugin {
       this.registerEvent(vault.on('modify', (f) => this.schedule(f)))
       this.registerEvent(vault.on('delete', (f) => {
         this.index.remove(f.path)
+        this.dirty = true
         this.scheduleSave()
       }))
       this.registerEvent(vault.on('rename', (f, old) => this.onRename(f, old)))
@@ -46,6 +49,7 @@ export default class EmbeddingsPlugin extends Plugin {
 
   onunload() {
     for (const t of this.timers.values()) window.clearTimeout(t)
+    this.scheduleSave.run()
   }
 
   refreshView() {
@@ -81,6 +85,7 @@ export default class EmbeddingsPlugin extends Plugin {
     if (isSkipped(f.path)) this.index.remove(oldPath)
     else if (this.index.has(oldPath)) this.index.rename(oldPath, f.path)
     else return this.schedule(f)
+    this.dirty = true
     this.scheduleSave()
   }
 
@@ -129,7 +134,8 @@ export default class EmbeddingsPlugin extends Plugin {
     } finally {
       notice?.hide()
       this.running = false
-      await this.saveIndex()
+      if (done > 50) await this.saveIndex()
+      else this.scheduleSave()
       this.refreshView()
     }
   }
@@ -139,6 +145,7 @@ export default class EmbeddingsPlugin extends Plugin {
     const chunks = chunkNote(await this.app.vault.read(file))
     const vectors = chunks.length ? await this.embedder.embed(chunks.map((c) => docInput(file.basename, c.text))) : []
     this.index.setFile(file.path, mtime, chunks.map((c, i) => ({ heading: c.heading, vector: vectors[i] })))
+    this.dirty = true
     this.error = null
   }
 
@@ -148,8 +155,11 @@ export default class EmbeddingsPlugin extends Plugin {
     return VectorIndex.parse(json, MODEL, DIMS)
   }
 
-  // ponytail: rewrites the whole file (~15MB) on every save; switch to int8 vectors if iCloud sync suffers.
+  // Skips unchanged indexes, so a failed rebuild doesn't overwrite the saved one with an empty index.
+  // ponytail: still rewrites the whole file (~15MB) per save; switch to int8 vectors if iCloud sync suffers.
   private async saveIndex() {
+    if (!this.dirty) return
+    this.dirty = false
     await this.app.vault.adapter.write(this.indexPath, this.index.toJSON())
   }
 }
