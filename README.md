@@ -2,10 +2,10 @@
 
 A personal Obsidian plugin that embeds your vault with [EmbeddingGemma 2](https://blog.google/innovation-and-ai/technology/developers-tools/embeddinggemma-2/) running locally in Ollama. It adds:
 
-- a **Related notes** sidebar listing the notes most similar to the open one, with a **＋** button that adds a `[[link]]` to its `## Related` section
+- a **Related notes** sidebar listing the notes most similar to the open one, with a **＋** button that adds a `[[link]]` to its `## Related` section. Each suggestion shows which section of the open note it matched. Near-copies collapse into one line, and notes that link to no hub get a "Belongs under" hub suggestion. A **Debug** toggle shows matches below the threshold.
 - a **Semantic search** popup that finds notes by meaning, in any language the model knows
 
-Nothing leaves your machine. Notes are split at `##` headings, each section is embedded, and vectors live in `.obsidian/plugins/obsidian-embeddings/index.json`.
+Nothing leaves your machine. Notes are split at `##` headings, each section is embedded, and vectors live in `.obsidian/plugins/obsidian-embeddings/index.json`. Scores are mean-centered: the average of all vectors is subtracted before comparing, which separates related from unrelated notes much better than raw cosine.
 
 ## Setup
 
@@ -33,5 +33,5 @@ Then enable **Local Embeddings** in Settings → Community plugins. The first in
 
 ## Notes
 
-- Desktop only, built for my own vault. There's no settings tab. The constants are in `src/embed.ts` (server, model), `src/chunk.ts` (skipped folders, chunk size) and `src/views.ts` (`MIN_SCORE`).
+- Desktop only, built for my own vault. There's no settings tab. The constants are in `src/embed.ts` (server, model), `src/chunk.ts` (skipped folders, chunk size) and `src/views.ts` (`MIN_SCORE`, `NEAR_COPY`). Hub rules are in `findHubs` in `src/related.ts`.
 - `npm run check` runs the tests. `scripts/measure.ts` produced the numbers in the blog post.
