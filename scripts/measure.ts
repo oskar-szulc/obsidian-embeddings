@@ -6,6 +6,8 @@ import { BASE_URL, createEmbedder, docInput, MODEL, normalize, queryInput } from
 import { dot, VectorIndex } from '../src/index'
 
 const vault = process.argv[2]
+// Extra folders to leave out, comma-separated, like the plugin's skipFolders.
+const SKIP = process.env.SKIP?.split(',') ?? []
 if (!vault) throw new Error('usage: npx tsx scripts/measure.ts "<vault path>"')
 
 const embedder = createEmbedder(async (url, body) => {
@@ -18,7 +20,7 @@ const embedder = createEmbedder(async (url, body) => {
 const QUERIES: [string, string[]][] = JSON.parse(readFileSync(process.argv[3] ?? 'scripts/queries.json', 'utf8'))
 
 const paths = (readdirSync(vault, { recursive: true }) as string[])
-  .filter((p) => p.endsWith('.md') && !p.split('/').some((s) => s.startsWith('.')) && !isSkipped(p))
+  .filter((p) => p.endsWith('.md') && !p.split('/').some((s) => s.startsWith('.')) && !isSkipped(p, SKIP))
 const notes = paths.map((p) => ({ path: p, title: basename(p, '.md'), md: readFileSync(join(vault, p), 'utf8') }))
 
 // A target that doesn't exist or has no text would make a miss meaningless.

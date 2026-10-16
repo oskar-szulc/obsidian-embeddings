@@ -14,6 +14,8 @@ export default class EmbeddingsPlugin extends Plugin {
   index = new VectorIndex(MODEL, DIMS)
   embedder = createEmbedder(transport)
   error: string | null = null
+  // Vault-specific folders to leave out (templates, attachments), from data.json: { "skipFolders": [...] }.
+  skipFolders: string[] = []
   private queue = new Set<string>()
   private running = false
   private timers = new Map<string, number>()
@@ -26,6 +28,7 @@ export default class EmbeddingsPlugin extends Plugin {
   }
 
   async onload() {
+    this.skipFolders = (await this.loadData())?.skipFolders ?? []
     this.registerView(VIEW_TYPE, (leaf) => new RelatedView(leaf, this))
     this.addCommand({ id: 'open-related', name: 'Open related notes', callback: () => void this.openRelated() })
     this.addCommand({ id: 'semantic-search', name: 'Semantic search', callback: () => new SearchModal(this.app, this).open() })
@@ -70,7 +73,7 @@ export default class EmbeddingsPlugin extends Plugin {
 
   // Debounced per path: re-embed 2 s after the last change.
   private schedule(f: TAbstractFile) {
-    if (!(f instanceof TFile) || f.extension !== 'md' || isSkipped(f.path)) return
+    if (!(f instanceof TFile) || f.extension !== 'md' || isSkipped(f.path, this.skipFolders)) return
     window.clearTimeout(this.timers.get(f.path))
     this.timers.set(f.path, window.setTimeout(() => {
       this.timers.delete(f.path)
@@ -83,7 +86,7 @@ export default class EmbeddingsPlugin extends Plugin {
   // the old ones move to the new path so the sidebar keeps working.
   private onRename(f: TAbstractFile, oldPath: string) {
     if (!(f instanceof TFile) || f.extension !== 'md') return
-    if (!isSkipped(f.path)) {
+    if (!isSkipped(f.path, this.skipFolders)) {
       this.index.rename(oldPath, f.path)
       return this.schedule(f)
     }
@@ -94,7 +97,7 @@ export default class EmbeddingsPlugin extends Plugin {
 
   // Also catches deletes and renames made while Obsidian was closed.
   private enqueueStale() {
-    const files = this.app.vault.getMarkdownFiles().filter((f) => !isSkipped(f.path))
+    const files = this.app.vault.getMarkdownFiles().filter((f) => !isSkipped(f.path, this.skipFolders))
     this.index.prune(new Set(files.map((f) => f.path)))
     for (const p of this.index.stalePaths(files.map((f) => ({ path: f.path, mtime: f.stat.mtime })))) this.queue.add(p)
     void this.run()

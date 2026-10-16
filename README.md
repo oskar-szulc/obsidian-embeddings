@@ -67,19 +67,27 @@ If Ollama is down, the sidebar keeps working from stored vectors. Search and ind
 
 ## Tuning
 
-Built for my own vault, so there's no settings tab. The constants:
+Built for my own vault, so there's no settings tab.
+
+Hidden folders (`.obsidian`, `.trash`, …) and `node_modules` are always skipped. To leave out other folders, such as templates or attachments, create `.obsidian/plugins/obsidian-embeddings/data.json` and reload the plugin:
+
+```json
+{ "skipFolders": ["Templates", "Attachments"] }
+```
+
+The other settings are constants in the code:
 
 | Where | What |
 |---|---|
 | `src/embed.ts` | Server URL, model, dimensions |
-| `src/chunk.ts` | Skipped folders and sections, max chunk size |
+| `src/chunk.ts` | Skipped sections, max chunk size |
 | `src/views.ts` | `MIN_SCORE` (0.37), `NEAR_COPY` (0.86) |
 | `src/related.ts` | Hub rule in `findHubs` |
 
 `MIN_SCORE` is the 25th percentile of scores between notes that link to each other. To measure it on your vault, copy `scripts/queries.example.json` to `scripts/queries.json`, replace the queries with ones whose answers you know, and run:
 
 ```bash
-npx tsx scripts/measure.ts "/path/to/your/vault"
+SKIP=Templates,Attachments npx tsx scripts/measure.ts "/path/to/your/vault"
 ```
 
 It reports hit@5 with and without prefixes, 768 vs. 256 dimensions, and the score spread for linked vs. random note pairs.

@@ -8,10 +8,11 @@ export const MAX_CHUNK_CHARS = 24000
 
 // Link lists: embedding them makes every note look like its own hubs.
 const SKIP_SECTIONS = new Set(['related', 'references'])
-const SKIP_PREFIXES = ['.obsidian/', '.trash/', 'Templates/', 'Attachments/']
-
-export const isSkipped = (path: string) =>
-  SKIP_PREFIXES.some((p) => path.startsWith(p)) || path.split('/').includes('node_modules')
+// Hidden folders (.obsidian, .trash, …) and node_modules always; other folders come from the caller,
+// e.g. "skipFolders" in the plugin's data.json.
+export const isSkipped = (path: string, folders: string[] = []) =>
+  path.split('/').some((s) => s.startsWith('.') || s === 'node_modules') ||
+  folders.some((f) => path.startsWith(f.replace(/\/?$/, '/')))
 
 export function chunkNote(markdown: string): Chunk[] {
   const body = markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')

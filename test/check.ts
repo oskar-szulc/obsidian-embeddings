@@ -63,11 +63,14 @@ console.log('embed ok')
   assert.deepEqual(chunkNote('---\na: 1\n---\n\n## Related\n[[A]]'), [])
   assert.deepEqual(chunkNote('---\r\nid: 1\r\n---\r\nbody\r\n').map((x) => x.text), ['body'])
 
-  assert.ok(isSkipped('Templates/idea.md'))
-  assert.ok(isSkipped('Attachments/a.md'))
-  assert.ok(isSkipped('.trash/x.md'))
+  assert.ok(isSkipped('.obsidian/a.md'))
+  assert.ok(isSkipped('notes/.trash/a.md'))
   assert.ok(isSkipped('tools/node_modules/pkg/README.md'))
   assert.ok(!isSkipped('notes/Example.md'))
+  assert.ok(isSkipped('Templates/idea.md', ['Templates']))
+  assert.ok(isSkipped('Templates/idea.md', ['Templates/']))
+  assert.ok(!isSkipped('Templates old/idea.md', ['Templates']))
+  assert.ok(!isSkipped('notes/Example.md', ['Templates']))
 }
 console.log('chunk ok')
 
