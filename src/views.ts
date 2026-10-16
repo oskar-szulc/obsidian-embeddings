@@ -79,6 +79,8 @@ export class RelatedView extends ItemView {
         e.preventDefault()
         void this.app.workspace.openLinkText(hit.path, file.path)
       }
+      // Which part of the open note this match came from; the intro chunk has no heading.
+      if (chunks > 1) name.createDiv({ text: `↳ from ${hit.from || 'intro'}`, cls: 'embeddings-from' })
       row.createSpan({ text: hit.score.toFixed(2), cls: 'embeddings-score' })
       const add = row.createEl('button', { text: '＋', attr: { 'aria-label': 'Add to Related' } })
       add.onclick = async () => {

@@ -131,6 +131,15 @@ console.log('chunk ok')
   assert.ok(close(shifted.related('0.md', 10, new Set()), plain.related('0.md', 10, new Set())), 'related ignores shared offset')
   assert.ok(close(shifted.search(q(1), 10), plain.search(q(0), 10)), 'search ignores shared offset')
 }
+// related() names the section of the open note behind each match.
+{
+  const ix = new VectorIndex('m', 3)
+  ix.setFile('a.md', 1, [{ heading: 'X', vector: Float32Array.of(1, 0, 0) }, { heading: 'Y', vector: Float32Array.of(0, 1, 0) }])
+  ix.setFile('b.md', 1, [{ heading: 'B', vector: Float32Array.of(0, 1, 0.1) }])
+  ix.setFile('c.md', 1, [{ heading: '', vector: Float32Array.of(0, 0, 1) }])
+  const b = ix.related('a.md', 10, new Set()).find((h) => h.path === 'b.md')!
+  assert.deepEqual([b.from, b.heading], ['Y', 'B'])
+}
 console.log('index ok')
 
 // ---- related ----

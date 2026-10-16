@@ -4,6 +4,8 @@ export interface Hit {
   path: string
   heading: string
   score: number
+  // related() only: the section of the open note that matched.
+  from?: string
 }
 
 export interface FileStamp {
@@ -105,7 +107,7 @@ export class VectorIndex {
   search(query: Float32Array, k: number): Hit[] {
     const cv = this.centeredVectors()
     const q = this.center(query)
-    return this.rank(this.chunks, (c) => dot(q, cv.get(c)!), k)
+    return this.rank(this.chunks, (c) => ({ score: dot(q, cv.get(c)!) }), k)
   }
 
   related(path: string, k: number, exclude: Set<string>): Hit[] {
@@ -113,7 +115,14 @@ export class VectorIndex {
     if (!own.length) return []
     const others = this.chunks.filter((c) => c.path !== path && !exclude.has(c.path))
     const cv = this.centeredVectors()
-    return this.rank(others, (c) => Math.max(...own.map((o) => dot(cv.get(o)!, cv.get(c)!))), k)
+    return this.rank(others, (c) => {
+      let best = { score: -Infinity, from: '' }
+      for (const o of own) {
+        const s = dot(cv.get(o)!, cv.get(c)!)
+        if (s > best.score) best = { score: s, from: o.heading }
+      }
+      return best
+    }, k)
   }
 
   private center(v: Float32Array) {
@@ -131,12 +140,12 @@ export class VectorIndex {
   }
 
   // Best-scoring chunk per note, highest first.
-  private rank(chunks: StoredChunk[], score: (c: StoredChunk) => number, k: number): Hit[] {
+  private rank(chunks: StoredChunk[], score: (c: StoredChunk) => { score: number; from?: string }, k: number): Hit[] {
     const best = new Map<string, Hit>()
     for (const c of chunks) {
       const s = score(c)
       const b = best.get(c.path)
-      if (!b || s > b.score) best.set(c.path, { path: c.path, heading: c.heading, score: s })
+      if (!b || s.score > b.score) best.set(c.path, { path: c.path, heading: c.heading, ...s })
     }
     return [...best.values()].sort((a, b) => b.score - a.score).slice(0, k)
   }
