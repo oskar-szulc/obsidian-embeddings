@@ -79,12 +79,15 @@ export default class EmbeddingsPlugin extends Plugin {
     }, 2000))
   }
 
-  // ponytail: vectors keep the old title in their prefix after a rename; re-embed on rename if that skews results.
+  // Every chunk is embedded with the note's title, so a renamed note gets new vectors. Until they arrive,
+  // the old ones move to the new path so the sidebar keeps working.
   private onRename(f: TAbstractFile, oldPath: string) {
     if (!(f instanceof TFile) || f.extension !== 'md') return
-    if (isSkipped(f.path)) this.index.remove(oldPath)
-    else if (this.index.has(oldPath)) this.index.rename(oldPath, f.path)
-    else return this.schedule(f)
+    if (!isSkipped(f.path)) {
+      this.index.rename(oldPath, f.path)
+      return this.schedule(f)
+    }
+    this.index.remove(oldPath)
     this.dirty = true
     this.scheduleSave()
   }

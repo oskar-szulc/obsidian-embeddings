@@ -25,3 +25,16 @@ export function addRelatedLink(markdown: string, target: string): string {
   }
   return `${markdown.replace(/\s*$/, '')}\n\n## Related\n${link}\n`
 }
+
+// Hub notes link out to many notes and are linked back from several. 10 out and 5 in matched the hubs I keep
+// by hand on my vault. Images and other attachments don't count.
+export function findHubs(links: Record<string, Record<string, number>>, minOut = 10, minIn = 5): Set<string> {
+  const incoming = new Map<string, number>()
+  const out = new Map<string, number>()
+  for (const [src, dests] of Object.entries(links)) {
+    const notes = Object.keys(dests).filter((d) => d.endsWith('.md') && d !== src)
+    out.set(src, notes.length)
+    for (const d of notes) incoming.set(d, (incoming.get(d) ?? 0) + 1)
+  }
+  return new Set([...out].filter(([p, n]) => n >= minOut && (incoming.get(p) ?? 0) >= minIn).map(([p]) => p))
+}

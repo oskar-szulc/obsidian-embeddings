@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createEmbedder, docInput, EmbedError, queryInput } from '../src/embed'
 import { chunkNote, isSkipped, MAX_CHUNK_CHARS } from '../src/chunk'
 import { VectorIndex } from '../src/index'
-import { addRelatedLink } from '../src/related'
+import { addRelatedLink, findHubs } from '../src/related'
 
 // ---- embed ----
 assert.equal(docInput('T', 'x'), 'title: T | text: x')
@@ -152,4 +152,17 @@ assert.equal(addRelatedLink('## Related\nSee also:\n', 'X'), '## Related\n[[X]]\
 for (const md of ['## Related\n[[X]]', '## Related\n[[x|alias]]', '## Related\n[[X#Part]]'])
   assert.equal(addRelatedLink(md, 'X'), md, `duplicate: ${md}`)
 assert.equal(addRelatedLink('## Related\n[[A]]\n## Other\n[[X]]', 'X'), '## Related\n[[A]] • [[X]]\n## Other\n[[X]]')
+{
+  const notes = Array.from({ length: 10 }, (_, i) => `n${i}.md`)
+  const to = (ps: string[]) => Object.fromEntries(ps.map((p) => [p, 1]))
+  const links: Record<string, Record<string, number>> = {
+    'hub.md': to(notes),
+    'busy.md': to([...notes, 'a.png', 'b.png']),
+    'wide.md': to(notes.slice(0, 9).concat('img.png')),
+  }
+  for (const n of notes.slice(0, 5)) links[n] = to(['hub.md', 'wide.md'])
+  links['n5.md'] = to(['busy.md', 'busy.png'])
+  // hub: 10 out, 5 in. busy: 10 notes out (images don't count) but 1 in. wide: 5 in but only 9 notes out.
+  assert.deepEqual([...findHubs(links)], ['hub.md'])
+}
 console.log('related ok')

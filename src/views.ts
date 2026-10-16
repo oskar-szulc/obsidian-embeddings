@@ -2,12 +2,15 @@ import { App, ItemView, Notice, SuggestModal, TFile, WorkspaceLeaf } from 'obsid
 import type EmbeddingsPlugin from './main'
 import { EmbedError, queryInput } from './embed'
 import type { Hit } from './index'
-import { addRelatedLink } from './related'
+import { addRelatedLink, findHubs } from './related'
 
 export const VIEW_TYPE = 'embeddings-related'
 // 25th percentile of linked-note pair scores after mean-centering (2026-10-15; linked median 0.48, random
 // median 0.13). Before centering it was 0.76, and random pairs at p95 scored above the linked median.
 export const MIN_SCORE = 0.37
+// Above this, notes are copies of each other (tailored versions of one document, daily snapshots), not
+// suggestions. On my vault, tailored versions pair at 0.87-0.89; the closest real suggestion is 0.85.
+export const NEAR_COPY = 0.86
 
 export const label = (hit: Hit) =>
   hit.path.replace(/\.md$/, '').split('/').pop()! + (hit.heading ? ` › ${hit.heading}` : '')
@@ -61,9 +64,23 @@ export class RelatedView extends ItemView {
       el.createEl('p', { text: `${chunks} chunks · ${linked.size} linked (hidden) · threshold ${MIN_SCORE}`, cls: 'embeddings-debug' })
     if (!chunks) return void el.createEl('p', { text: 'This note has no text to embed.' })
 
-    const all = index.related(file.path, 10, linked)
-    const hits = this.debug ? all : all.filter((h) => h.score >= MIN_SCORE)
-    if (!hits.length)
+    const hubs = findHubs(this.app.metadataCache.resolvedLinks)
+    const all = index.related(file.path, Infinity, linked)
+    // Notes that link to no hub get the closest one as "where this belongs". Measured on my vault,
+    // the closest hub above MIN_SCORE is a hub the note already links to 89% of the time.
+    const hub = hubs.has(file.path) || [...linked].some((p) => hubs.has(p))
+      ? undefined
+      : all.find((h) => hubs.has(h.path) && h.score >= MIN_SCORE)
+    const copies = all.filter((h) => h.score >= NEAR_COPY)
+    const rest = all.filter((h) => h.score < NEAR_COPY && h !== hub).slice(0, 10)
+    const hits = this.debug ? rest : rest.filter((h) => h.score >= MIN_SCORE)
+
+    if (hub) {
+      el.createDiv({ text: 'Belongs under', cls: 'embeddings-debug' })
+      this.row(el, hub, file, chunks)
+      el.createDiv({ text: 'Related', cls: 'embeddings-debug embeddings-divider' })
+    }
+    if (!hits.length && !copies.length)
       return void el.createEl('p', { text: `No related notes above ${MIN_SCORE}. Turn on Debug to see the closest ones.` })
 
     let divider = false
@@ -73,23 +90,41 @@ export class RelatedView extends ItemView {
         el.createDiv({ text: `— below ${MIN_SCORE} —`, cls: 'embeddings-debug embeddings-divider' })
         divider = true
       }
-      const row = el.createDiv({ cls: below ? 'embeddings-row embeddings-below' : 'embeddings-row' })
-      const name = row.createEl('a', { text: label(hit), cls: 'embeddings-name', href: '#' })
-      name.onclick = (e) => {
-        e.preventDefault()
-        void this.app.workspace.openLinkText(hit.path, file.path)
-      }
-      // Which part of the open note this match came from; the intro chunk has no heading.
-      if (chunks > 1) name.createDiv({ text: `↳ from ${hit.from || 'intro'}`, cls: 'embeddings-from' })
-      row.createSpan({ text: hit.score.toFixed(2), cls: 'embeddings-score' })
-      const add = row.createEl('button', { text: '＋', attr: { 'aria-label': 'Add to Related' } })
-      add.onclick = async () => {
-        const target = this.app.vault.getAbstractFileByPath(hit.path)
-        if (!(target instanceof TFile)) return
-        const link = this.app.metadataCache.fileToLinktext(target, file.path, true)
-        await this.app.vault.process(file, (md) => addRelatedLink(md, link))
-        row.remove()
-      }
+      this.row(el, hit, file, chunks, below)
+    }
+
+    if (copies.length) {
+      const line = el.createDiv({ text: `Near-copies (${copies.length}): `, cls: 'embeddings-debug embeddings-copies' })
+      copies.slice(0, 5).forEach((h, i) => {
+        if (i) line.appendText(', ')
+        this.link(line, h.path, label(h), file)
+      })
+      if (copies.length > 5) line.appendText(', …')
+    }
+  }
+
+  private link(parent: HTMLElement, path: string, text: string, from: TFile) {
+    const a = parent.createEl('a', { text, cls: 'embeddings-name', href: '#' })
+    a.onclick = (e) => {
+      e.preventDefault()
+      void this.app.workspace.openLinkText(path, from.path)
+    }
+    return a
+  }
+
+  private row(el: HTMLElement, hit: Hit, file: TFile, chunks: number, below = false) {
+    const row = el.createDiv({ cls: below ? 'embeddings-row embeddings-below' : 'embeddings-row' })
+    const name = this.link(row, hit.path, label(hit), file)
+    // Which part of the open note this match came from; the intro chunk has no heading.
+    if (chunks > 1) name.createDiv({ text: `↳ from ${hit.from || 'intro'}`, cls: 'embeddings-from' })
+    row.createSpan({ text: hit.score.toFixed(2), cls: 'embeddings-score' })
+    const add = row.createEl('button', { text: '＋', attr: { 'aria-label': 'Add to Related' } })
+    add.onclick = async () => {
+      const target = this.app.vault.getAbstractFileByPath(hit.path)
+      if (!(target instanceof TFile)) return
+      const link = this.app.metadataCache.fileToLinktext(target, file.path, true)
+      await this.app.vault.process(file, (md) => addRelatedLink(md, link))
+      row.remove()
     }
   }
 }
