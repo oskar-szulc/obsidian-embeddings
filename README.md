@@ -1,9 +1,9 @@
 # Local Embeddings for Obsidian
 
-Related notes and semantic search for your Obsidian vault, powered by [EmbeddingGemma 2](https://blog.google/innovation-and-ai/technology/developers-tools/embeddinggemma-2/) running locally in Ollama. Nothing leaves your machine.
+Related notes and semantic search for your Obsidian vault, powered by [EmbeddingGemma 2](https://blog.google/innovation-and-ai/technology/developers-tools/embeddinggemma-2/) running locally in Ollama.
 
 - **Related notes sidebar.** Shows the notes closest in meaning to the one you have open. Click **＋** to add a `[[link]]` to the note's `## Related` section.
-- **Semantic search.** Type what you mean, not the exact words. A query in English finds notes written in other languages, and notes that never use the query's words.
+- **Semantic search.**. A query in English finds notes written in other languages, and notes that never use the query's words.
 
 ## What the sidebar shows
 
