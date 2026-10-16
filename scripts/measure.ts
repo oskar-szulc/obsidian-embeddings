@@ -58,8 +58,9 @@ async function hitAt5(name: string, ix: VectorIndex, prefixed: boolean, dims: nu
   for (const [q, targets] of QUERIES) {
     const [full] = await embedder.embed([prefixed ? queryInput(q) : q])
     const v = dims < 768 ? normalize(full.subarray(0, dims)) : full
-    const top = ix.search(v, 5).map((h) => basename(h.path, '.md'))
-    const ok = top.some((t) => targets.includes(t))
+    // macOS can store accented filenames decomposed (NFD); compare in NFC.
+    const top = ix.search(v, 5).map((h) => basename(h.path, '.md').normalize('NFC'))
+    const ok = top.some((t) => targets.some((x) => x.normalize('NFC') === t))
     hits += Number(ok)
     console.log(`  ${ok ? '✓' : '✗'} ${q}\n      ${top.join(' | ')}`)
   }
@@ -69,7 +70,16 @@ async function hitAt5(name: string, ix: VectorIndex, prefixed: boolean, dims: nu
 const pct = (xs: number[], p: number) => [...xs].sort((a, b) => a - b)[Math.floor((xs.length - 1) * p)]
 const pairScore = (a: Float32Array[], b: Float32Array[]) => Math.max(...a.flatMap((x) => b.map((y) => dot(x, y))))
 
-function scoreSpread(byNote: Map<string, Float32Array[]>) {
+// Same scoring as VectorIndex: subtract the mean of all chunks, then renormalize.
+function centered(byNote: Map<string, Float32Array[]>) {
+  const all = [...byNote.values()].flat()
+  const mean = new Float32Array(all[0].length)
+  for (const v of all) for (let i = 0; i < v.length; i++) mean[i] += v[i] / all.length
+  return new Map([...byNote].map(([p, vs]) => [p, vs.map((v) => normalize(v.map((x, i) => x - mean[i])))]))
+}
+
+function scoreSpread(raw: Map<string, Float32Array[]>) {
+  const byNote = centered(raw)
   const byTitle = new Map(notes.map((n) => [n.title.toLowerCase(), n.path]))
   const linked: number[] = []
   for (const n of notes) {
@@ -90,10 +100,10 @@ function scoreSpread(byNote: Map<string, Float32Array[]>) {
   }
   const row = (name: string, xs: number[]) =>
     console.log(`  ${name.padEnd(8)} n=${String(xs.length).padEnd(5)} p10=${pct(xs, 0.1).toFixed(2)} p25=${pct(xs, 0.25).toFixed(2)} p50=${pct(xs, 0.5).toFixed(2)} p90=${pct(xs, 0.9).toFixed(2)} p95=${pct(xs, 0.95).toFixed(2)}`)
-  console.log('\nnote-pair scores (best chunk pair)')
+  console.log('\nnote-pair scores (best chunk pair, mean-centered)')
   row('linked', linked)
   row('random', random)
-  console.log(`  suggested MIN_SCORE (random p95) = ${pct(random, 0.95).toFixed(2)}`)
+  console.log(`  suggested MIN_SCORE (linked p25) = ${pct(linked, 0.25).toFixed(2)}`)
 }
 
 const pre = await build(true)
