@@ -1,3 +1,6 @@
 node_modules/
 main.js
 index.json
+scripts/queries.json
+scripts/measure-output.txt
+docs/

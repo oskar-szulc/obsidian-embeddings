@@ -1,4 +1,4 @@
-// Usage: npx tsx scripts/measure.ts "<vault path>"   (BASE_URL env overrides the server)
+// Usage: npx tsx scripts/measure.ts "<vault path>" [queries.json]   (BASE_URL env overrides the server)
 import { readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { chunkNote, isSkipped } from '../src/chunk'
@@ -14,8 +14,8 @@ const embedder = createEmbedder(async (url, body) => {
 }, process.env.BASE_URL ?? BASE_URL)
 
 // Queries written without the target note's keywords. Any listed note in the top 5 counts as a hit.
-const QUERIES: [string, string[]][] = [
-]
+// Format: [["query", ["Target note title", ...]], ...]. See scripts/queries.example.json.
+const QUERIES: [string, string[]][] = JSON.parse(readFileSync(process.argv[3] ?? 'scripts/queries.json', 'utf8'))
 
 const paths = (readdirSync(vault, { recursive: true }) as string[])
   .filter((p) => p.endsWith('.md') && !p.split('/').some((s) => s.startsWith('.')) && !isSkipped(p))
