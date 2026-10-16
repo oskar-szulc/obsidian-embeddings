@@ -5,9 +5,9 @@ import type { Hit } from './index'
 import { addRelatedLink } from './related'
 
 export const VIEW_TYPE = 'embeddings-related'
-// 25th percentile of linked-note pair scores (scripts/measure-output.txt, 2026-10-15). Random pairs reach
-// 0.86 at p95, above the linked median (0.82), so the random-p95 rule would hide most real neighbours.
-export const MIN_SCORE = 0.76
+// 25th percentile of linked-note pair scores after mean-centering (2026-10-15; linked median 0.48, random
+// median 0.13). Before centering it was 0.76, and random pairs at p95 scored above the linked median.
+export const MIN_SCORE = 0.37
 
 export const label = (hit: Hit) =>
   hit.path.replace(/\.md$/, '').split('/').pop()! + (hit.heading ? ` › ${hit.heading}` : '')

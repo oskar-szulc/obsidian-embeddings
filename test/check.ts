@@ -84,7 +84,6 @@ console.log('chunk ok')
 
   const r = ix.related('a.md', 10, new Set())
   assert.deepEqual(r.map((h) => h.path), ['b.md', 'c.md'])
-  assert.ok(Math.abs(r[0].score - 0.8) < 1e-6)
   assert.deepEqual(ix.related('a.md', 10, new Set(['b.md'])).map((h) => h.path), ['c.md'])
 
   assert.ok(ix.has('empty.md'))
@@ -115,6 +114,22 @@ console.log('chunk ok')
   assert.ok(!ix.has('c.md') && !ix.search(v(-1, 0), 10).some((h) => h.path === 'c.md'))
   ix.prune(new Set(['a.md']))
   assert.ok(ix.has('a.md') && !ix.has('x/b.md') && !ix.has('empty.md'))
+}
+// Centering: a direction every vector shares adds nothing, so a shared offset leaves results unchanged.
+{
+  const base = [[1, 0, 0], [0.9, 0.3, 0.1], [0, 1, 0.2], [0.1, 0.2, 1]]
+  const offset = [5, 5, 5]
+  const build = (shift: number) => {
+    const ix = new VectorIndex('m', 3)
+    base.forEach((b, i) => ix.setFile(`${i}.md`, 1, [{ heading: '', vector: Float32Array.from(b, (x, d) => x + shift * offset[d]) }]))
+    return ix
+  }
+  const [plain, shifted] = [build(0), build(1)]
+  const q = (shift: number) => Float32Array.from([0, 0.9, 0.3], (x, d) => x + shift * offset[d])
+  const close = (a: { path: string; score: number }[], b: typeof a) =>
+    a.length === b.length && a.every((h, i) => h.path === b[i].path && Math.abs(h.score - b[i].score) < 1e-5)
+  assert.ok(close(shifted.related('0.md', 10, new Set()), plain.related('0.md', 10, new Set())), 'related ignores shared offset')
+  assert.ok(close(shifted.search(q(1), 10), plain.search(q(0), 10)), 'search ignores shared offset')
 }
 console.log('index ok')
 

@@ -1,3 +1,5 @@
+import { normalize } from './embed'
+
 export interface Hit {
   path: string
   heading: string
@@ -15,7 +17,7 @@ interface StoredChunk {
   vector: Float32Array
 }
 
-// Vectors are normalized, so the dot product is cosine similarity.
+// Scoring vectors are normalized, so the dot product is cosine similarity.
 export function dot(a: Float32Array, b: Float32Array): number {
   let s = 0
   for (let i = 0; i < a.length; i++) s += a[i] * b[i]
@@ -30,6 +32,10 @@ const decode = (s: string) => new Float32Array(Uint8Array.from(Buffer.from(s, 'b
 export class VectorIndex {
   private files = new Map<string, number>()
   private chunks: StoredChunk[] = []
+  // Embeddings share one large direction (mean vector length 0.79 on my vault), so raw cosine rates every
+  // pair as similar. Scoring subtracts the mean of all chunks and renormalizes; disk keeps raw vectors.
+  private mean = new Float32Array(0)
+  private centered: Map<StoredChunk, Float32Array> | null = null
 
   constructor(readonly model: string, readonly dims: number) {}
 
@@ -71,11 +77,13 @@ export class VectorIndex {
   setFile(path: string, mtime: number, chunks: { heading: string; vector: Float32Array }[]) {
     this.files.set(path, mtime)
     this.chunks = this.chunks.filter((c) => c.path !== path).concat(chunks.map((c) => ({ path, ...c })))
+    this.centered = null
   }
 
   remove(path: string) {
     this.files.delete(path)
     this.chunks = this.chunks.filter((c) => c.path !== path)
+    this.centered = null
   }
 
   rename(oldPath: string, newPath: string) {
@@ -95,14 +103,31 @@ export class VectorIndex {
   }
 
   search(query: Float32Array, k: number): Hit[] {
-    return this.rank(this.chunks, (c) => dot(query, c.vector), k)
+    const cv = this.centeredVectors()
+    const q = this.center(query)
+    return this.rank(this.chunks, (c) => dot(q, cv.get(c)!), k)
   }
 
   related(path: string, k: number, exclude: Set<string>): Hit[] {
     const own = this.chunks.filter((c) => c.path === path)
     if (!own.length) return []
     const others = this.chunks.filter((c) => c.path !== path && !exclude.has(c.path))
-    return this.rank(others, (c) => Math.max(...own.map((o) => dot(o.vector, c.vector))), k)
+    const cv = this.centeredVectors()
+    return this.rank(others, (c) => Math.max(...own.map((o) => dot(cv.get(o)!, cv.get(c)!))), k)
+  }
+
+  private center(v: Float32Array) {
+    return normalize(v.map((x, i) => x - this.mean[i]))
+  }
+
+  // ponytail: full recompute after any change, a few ms for a few thousand chunks; keep a running sum if that grows.
+  private centeredVectors() {
+    if (!this.centered) {
+      this.mean = new Float32Array(this.dims)
+      for (const c of this.chunks) for (let i = 0; i < this.dims; i++) this.mean[i] += c.vector[i] / this.chunks.length
+      this.centered = new Map(this.chunks.map((c) => [c, this.center(c.vector)]))
+    }
+    return this.centered
   }
 
   // Best-scoring chunk per note, highest first.
